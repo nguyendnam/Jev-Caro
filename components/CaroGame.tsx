@@ -128,7 +128,7 @@ export default function CaroGame() {
           <p className="eyebrow">SYSTEM ONE GAME LAB</p>
           <h1>JEV CARO</h1>
           <p className="subtitle">
-            Bạn là X. Jev là O. Luật bắt buộc do code xử lý; Jev chọn nước chiến lược.
+            Bạn là X. Jev là O. Luật bắt buộc do code xử lý. Jev chọn nước chiến lược.
           </p>
         </div>
         <button className="resetButton" onClick={resetGame}>
@@ -140,7 +140,7 @@ export default function CaroGame() {
         <div className="boardPanel">
           <div className="statusBar">
             <strong>{status}</strong>
-            <span>15 × 15 · thắng khi có ≥ 5 quân liên tiếp</span>
+            <span>15 × 15 · Thắng khi có ≥ 5 quân liên tiếp</span>
           </div>
 
           <div className="boardWrap">
