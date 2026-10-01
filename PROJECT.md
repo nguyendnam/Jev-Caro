@@ -57,40 +57,40 @@ Caro-Jev/
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        NGƯỜI CHƠI CLICK Ô                           │
 │                    (Client — CaroGame.tsx)                          │
-│  • Đặt X lên bàn cờ                                                │
-│  • Kiểm tra thắng/hòa ngay tại client                              │
-│  • Nếu chưa kết thúc → POST /api/move { board }                   │
+│  • Đặt X lên bàn cờ                                                 │
+│  • Kiểm tra thắng/hòa ngay tại client                               │
+│  • Nếu chưa kết thúc → POST /api/move { board }                     │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   SERVER — app/api/move/route.ts                    │
 │                                                                     │
-│  Bước 0: Validate board shape (15×15, chỉ X/O/null)                │
+│  Bước 0: Validate board shape (15×15, chỉ X/O/null)                 │
 │     │                                                               │
 │     ▼                                                               │
-│  Bước 1: O có nước thắng ngay?  ──YES──▶  Trả "tactical-win"       │
+│  Bước 1: O có nước thắng ngay?  ──YES──>  Trả "tactical-win"        │
 │     │NO                                                             │
 │     ▼                                                               │
-│  Bước 2: X sắp thắng (cần chặn)? ──YES──▶  Trả "tactical-block"   │
+│  Bước 2: X sắp thắng (cần chặn)? ──YES──>  Trả "tactical-block"     │
 │     │NO                                                             │
 │     ▼                                                               │
-│  Bước 3: analyzeMoves() — tìm kiếm alpha-beta                      │
-│     │       → strategicChoices() — lọc nước cùng điểm cao nhất     │
+│  Bước 3: analyzeMoves() — tìm kiếm alpha-beta                       │
+│     │       → strategicChoices() — lọc nước cùng điểm cao nhất      │
 │     ▼                                                               │
-│  Bước 4: chooseMoveWithJev() — gửi shortlist cho Jev               │
+│  Bước 4: chooseMoveWithJev() — gửi shortlist cho Jev                │
 │     │                                                               │
-│     ├─ Thành công ──▶  Trả "jev" + confidence + probabilities      │
+│     ├─ Thành công ──> Trả "jev" + confidence + probabilities        │
 │     │                                                               │
-│     └─ Thất bại ───▶  Trả "fallback" (nước đầu analysis) + warning │
+│     └─ Thất bại ───> Trả "fallback" (nước đầu analysis) + warning   │
 │                                                                     │
 └────────────────────────────────┬────────────────────────────────────┘
                                  │
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   CLIENT — Cập nhật UI                              │
-│  • Đặt O lên bàn cờ (validate lại ô trống)                         │
-│  • Kiểm tra thắng/hòa cho O                                        │
+│  • Đặt O lên bàn cờ (validate lại ô trống)                          │
+│  • Kiểm tra thắng/hòa cho O                                         │
 │  • Hiển thị Decision Trace panel                                    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -389,35 +389,35 @@ Lệnh test thực hiện:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                         BROWSER                               │
+│                         BROWSER                              │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │              CaroGame.tsx (Client Component)            │  │
-│  │  • Bàn cờ 15×15 (X = người chơi, O = Jev)            │  │
-│  │  • Decision Trace Panel                                 │  │
+│  │              CaroGame.tsx (Client Component)           │  │
+│  │  • Bàn cờ 15×15 (X = người chơi, O = Jev)              │  │
+│  │  • Decision Trace Panel                                │  │
 │  │  • handleCellClick → POST /api/move                    │  │
 │  └────────────────────────┬───────────────────────────────┘  │
 └───────────────────────────┼──────────────────────────────────┘
                             │ HTTP POST { board }
                             ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    NEXT.JS SERVER (API Route)                 │
+│                    NEXT.JS SERVER (API Route)                │
 │                                                              │
 │  ┌──────────────────────────────────────────────────────┐    │
-│  │            app/api/move/route.ts                      │    │
+│  │            app/api/move/route.ts                     │    │
 │  │  Validate → Tactical → Search → Jev → Response       │    │
 │  └───────┬──────────┬───────────┬───────────────────────┘    │
-│          │          │           │                             │
-│          ▼          ▼           ▼                             │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                     │
+│          │          │           │                            │
+│          ▼          ▼           ▼                            │
+│  ┌──────────┐ ┌────────────┐ ┌──────────┐                    │
 │  │ lib/game │ │lib/strategy│ │ lib/jev  │                    │
 │  │  .ts     │ │   .ts      │ │   .ts    │                    │
-│  └──────────┘ └──────────┘ └─────┬────┘                     │
-│          ▲                        │                           │
-│          │                        │ HTTPS                     │
-│  ┌───────┴──────┐                 ▼                           │
+│  └──────────┘ └────────────┘ └─────┬────┘                    │
+│          ▲                         │                         │
+│          │                         │ HTTPS                   │
+│  ┌───────┴──────┐                  ▼                         │
 │  │lib/candidates│   ┌─────────────────────────┐              │
-│  │   .ts        │   │  TypeSafe SystemOne API  │              │
-│  └──────────────┘   │  (Jev AI Model)          │              │
+│  │   .ts        │   │  TypeSafe SystemOne API │              │
+│  └──────────────┘   │  (Jev AI Model)         │              │
 │                     └─────────────────────────┘              │
 └──────────────────────────────────────────────────────────────┘
 ```
