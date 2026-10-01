@@ -1,0 +1,319 @@
+:root {
+  --bg: #f3f0e8;
+  --ink: #111111;
+  --line: #111111;
+  --red: #ff3b30;
+  --blue: #0057ff;
+  --yellow: #ffd60a;
+  --purple: #7c3aed;
+  --panel: #fffdf7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    linear-gradient(90deg, rgba(0, 87, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(rgba(255, 59, 48, 0.04) 1px, transparent 1px),
+    var(--bg);
+  background-size: 28px 28px;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.shell {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 16px 0 24px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  padding: 0 0 14px;
+  border-bottom: 4px solid var(--line);
+}
+
+.eyebrow,
+.panelKicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(36px, 4.5vw, 60px);
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+}
+
+.subtitle {
+  max-width: 760px;
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.resetButton {
+  border: 3px solid var(--line);
+  background: var(--yellow);
+  padding: 10px 14px;
+  flex-shrink: 0;
+  font-weight: 900;
+  box-shadow: 6px 6px 0 var(--line);
+  cursor: pointer;
+}
+
+.resetButton:active {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.gameGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.boardPanel,
+.decisionPanel {
+  border: 3px solid var(--line);
+  background: var(--panel);
+  box-shadow: 8px 8px 0 var(--line);
+}
+
+.boardPanel {
+  padding: 12px;
+  min-width: 0;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 3px solid var(--line);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.statusBar strong {
+  font-size: 20px;
+}
+
+.statusBar span {
+  font-size: 13px;
+  text-align: right;
+}
+
+.boardWrap {
+  width: min(100%, calc(100dvh - 236px));
+  margin-inline: auto;
+}
+
+.columnLabels {
+  display: grid;
+  grid-template-columns: 24px repeat(15, minmax(0, 1fr));
+  height: 14px;
+  margin-bottom: 5px;
+}
+
+.columnLabels span,
+.rowLabels span {
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.boardWithRows {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+}
+
+.rowLabels {
+  display: grid;
+  grid-template-rows: repeat(15, 1fr);
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(15, minmax(0, 1fr));
+  grid-template-rows: repeat(15, minmax(0, 1fr));
+  border-top: 2px solid var(--line);
+  border-left: 2px solid var(--line);
+  aspect-ratio: 1;
+}
+
+.cell {
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: #f4d7a1;
+  color: var(--ink);
+  font-weight: 900;
+  font-size: clamp(12px, 2.6dvh, 26px);
+  cursor: pointer;
+  position: relative;
+}
+
+.cell:not(:disabled):hover {
+  background: #ffe8bd;
+}
+
+.cell-X {
+  color: var(--blue);
+}
+
+.cell-O {
+  color: var(--red);
+}
+
+.cell-last::after {
+  content: "";
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  top: 2px;
+  right: 2px;
+  background: var(--purple);
+}
+
+.decisionPanel {
+  padding: 16px;
+  min-width: 0;
+  max-height: calc(100dvh - 180px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  align-self: start;
+  position: sticky;
+  top: 20px;
+}
+
+.decisionPanel h2 {
+  margin: 0 0 14px;
+  font-size: 48px;
+  line-height: 1;
+  color: var(--purple);
+}
+
+.metric {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 2px solid var(--line);
+  font-size: 13px;
+}
+
+.metric strong {
+  text-align: right;
+}
+
+.probabilityList {
+  margin-top: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.probabilityMeta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.track {
+  height: 12px;
+  border: 2px solid var(--line);
+  background: #ffffff;
+}
+
+.fill {
+  height: 100%;
+  background: var(--blue);
+}
+
+.usage,
+.warning,
+.emptyState {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.usage {
+  margin-top: 16px;
+  border-top: 2px solid var(--line);
+  padding-top: 12px;
+}
+
+.warning {
+  padding: 10px;
+  border: 2px solid var(--line);
+  background: var(--yellow);
+}
+
+.emptyState {
+  border-top: 2px solid var(--line);
+  padding-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .gameGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .decisionPanel {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .shell {
+    width: calc(100% - 24px);
+    padding-top: 12px;
+  }
+
+  .hero {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .statusBar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .statusBar span {
+    text-align: left;
+  }
+}
+
+@media (max-width: 760px) {
+  .boardWrap {
+    width: 100%;
+  }
+
+  .statusBar {
+    gap: 6px;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "noEmit": false,
+    "outDir": ".test-build",
+    "incremental": false,
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "lib/game.ts",
+    "lib/candidates.ts",
+    "lib/strategy.ts",
+    "types/game.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
