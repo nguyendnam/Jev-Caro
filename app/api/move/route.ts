@@ -52,11 +52,6 @@ export async function POST(request: Request) {
       return NextResponse.json(tacticalResponse(winningMove, "tactical-win"));
     }
 
-    const blockingMove = findImmediateMove(board, "X");
-    if (blockingMove) {
-      return NextResponse.json(tacticalResponse(blockingMove, "tactical-block"));
-    }
-
     const analysis = analyzeMoves(board);
     const shortlist = strategicChoices(analysis);
     const candidates = shortlist.map(item => item.move);
@@ -64,16 +59,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No legal move available" }, { status: 409 });
     }
 
+    // Use the searched defense, including forcing continuations, rather than
+    // returning the first winning square found in row/column order.
+    if (findImmediateMove(board, "X")) {
+      const response = tacticalResponse(analysis[0].move, "tactical-block");
+      response.searchDepth = analysis[0].depth;
+      response.reason = analysis[0].score <= -9_000_000
+        ? "Đối thủ đã có thế thắng bắt buộc; chặn một đầu không đủ cứu ván cờ."
+        : "Chặn đường thắng trực tiếp, sau khi kiểm tra các nước tiếp theo.";
+      return NextResponse.json(response);
+    }
+
     try {
       const decision = await chooseMoveWithJev(board, candidates, shortlist);
       const response: MoveResponse = {
         ...decision,
         source: "jev",
+        searchDepth: shortlist[0].depth,
       };
       return NextResponse.json(response);
     } catch (error) {
       const warning = error instanceof Error ? error.message : "Unknown Jev error";
-      return NextResponse.json(fallbackResponse(analysis[0].move, warning));
+      return NextResponse.json({ ...fallbackResponse(analysis[0].move, warning), searchDepth: analysis[0].depth });
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";

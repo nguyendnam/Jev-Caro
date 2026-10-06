@@ -200,9 +200,17 @@ export default function CaroGame() {
                 <strong>{sourceLabel(lastDecision.source)}</strong>
               </div>
               <div className="metric">
-                <span>Confidence</span>
+                <span>Độ tin cậy chọn nước</span>
                 <strong>{Math.round(lastDecision.confidence * 100)}%</strong>
               </div>
+              {lastDecision.searchDepth !== undefined && (
+                <div className="metric">
+                  <span>Độ sâu tìm kiếm</span>
+                  <strong>{lastDecision.searchDepth} lượt</strong>
+                </div>
+              )}
+              {lastDecision.reason && <p className="usage">{lastDecision.reason}</p>}
+              <p className="usage">Độ tin cậy chọn nước không phải xác suất thắng ván cờ.</p>
               {lastDecision.model && (
                 <div className="metric">
                   <span>Model</span>

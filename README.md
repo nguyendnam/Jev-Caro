@@ -9,11 +9,11 @@ Human (X) vs TypeSafe Jev (O), 15x15 Caro/Gomoku.
 3. `POST /api/move` sends the current board to the server.
 4. Server first checks deterministic tactics:
    - O can win immediately -> take it.
-   - X can win immediately -> block it.
-5. Otherwise, the engine scores nearby cells for straight and broken threats, then runs iterative alpha-beta search (up to four plies, approximately one second). Forced blocks extend the search horizon. Candidate pruning makes this a bounded heuristic search, not a proof of optimal play.
+   - X can win immediately -> use the searched defense, and report if the position is already a forced loss.
+5. The engine checks all nearby defenses against immediate wins and moves creating two distinct winning replies before pruning, even if the search budget expires. It then runs iterative alpha-beta search (up to six plies, approximately 1.5 seconds). Forced blocks and defenses against forks extend the search horizon. Candidate pruning makes this a bounded heuristic search, not a proof of optimal play.
 6. Server asks Jev a `choice` question only over moves tied for the best completed search evaluation. Each candidate includes its score and search depth.
 7. The API validates Jev's selected cell before returning it to the browser.
-8. UI renders Jev's confidence and probability distribution.
+8. UI renders Jev's confidence and probability distribution, completed search depth, and tactical explanations. Selection confidence is not the probability of winning the game.
 
 ## Rules used by this demo
 
@@ -50,4 +50,4 @@ If the TypeSafe key is missing or the API call fails, `/api/move` returns the hi
 
 ## Strategy checks
 
-Run `npm test` to check immediate wins, broken fours, open-three defense, crossing threats, attacking fours, edge diagonals, legal moves and board preservation. The external Jev API has an eight-second timeout before using the local fallback.
+Run `npm test` to check immediate wins, broken fours, open-three defense, crossing threats, attacking fours, edge diagonals, legal moves, board preservation, the screenshot's diagonal fork (including with an expired search budget), and API tactical responses. The external Jev API has an eight-second timeout before using the local fallback.

@@ -12,6 +12,8 @@
     "lib/game.ts",
     "lib/candidates.ts",
     "lib/strategy.ts",
+    "lib/jev.ts",
+    "app/api/move/route.ts",
     "types/game.ts"
   ],
   "exclude": [

@@ -21,4 +21,6 @@ export type MoveResponse = {
     output_tokens: number;
   };
   warning?: string;
+  searchDepth?: number;
+  reason?: string;
 };
