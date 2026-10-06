@@ -1,448 +1,104 @@
-# JEV CARO — Mô tả dự án & Kiến trúc
+# Jev Caro — Kiến trúc hiện tại
 
-> Game Caro (Gomoku) 15×15: Người chơi (X) đấu với AI "Jev" (O).
-> Triết lý: **luật bắt buộc do code deterministic xử lý; Jev chỉ chọn nước chiến lược** trong danh sách đã được bộ máy tìm kiếm đối kháng thẩm định.
+Tài liệu mô tả code hiện tại sau khi đơn giản hóa luồng Jev và giao diện. Hướng dẫn chạy nằm trong [README.md](README.md).
 
----
+## Mục tiêu và luật
 
-## 1. Tổng quan công nghệ
+Caro freestyle 15 × 15, người chơi X đi trước và Jev chơi O. Ít nhất năm quân liên tiếp theo một trong bốn hướng là thắng, kể cả khi hai đầu bị chặn. Bàn đầy mà chưa có người thắng là hòa.
 
-| Thành phần | Công nghệ |
-|---|---|
-| Framework | Next.js (App Router) |
-| UI | React 19, CSS thuần (`globals.css`) |
-| Ngôn ngữ | TypeScript strict |
-| AI Engine | Negamax + Alpha-Beta pruning, Iterative Deepening |
-| AI Integration | Jev (TypeSafe SystemOne API) |
-| Testing | Node.js built-in test runner |
-| Runtime | Node.js 18+ |
+Code kiểm tra tính hợp lệ và các tình huống chiến thuật; Jev đánh giá chiến lược trong tập ứng viên. Chỉ có một luồng chơi, không có chế độ Nhanh/Cân bằng/Chuyên sâu.
 
----
+## Công nghệ và cấu trúc
 
-## 2. Cấu trúc thư mục
+Next.js App Router, React, TypeScript và CSS thuần; API chạy bằng Node.js. `package.json` khai báo các gói bằng `latest`, còn `package-lock.json` khóa phiên bản cài đặt. Dùng `npm ci` để tái lập môi trường.
 
-```
-Caro-Jev/
-├── app/
-│   ├── layout.tsx              # Root layout, metadata, lang="vi"
-│   ├── page.tsx                # Trang chủ — render <CaroGame />
-│   ├── globals.css             # Toàn bộ styling
-│   └── api/
-│       └── move/
-│           └── route.ts        # POST /api/move — pipeline quyết định
-├── components/
-│   └── CaroGame.tsx            # Client component: bàn cờ + decision trace
-├── lib/
-│   ├── game.ts                 # Logic cốt lõi (board, win/loss, serialize)
-│   ├── candidates.ts           # Sinh nước đi ứng viên theo mật độ
-│   ├── strategy.ts             # Tìm kiếm alpha-beta + đánh giá thế cờ
-│   └── jev.ts                  # Gọi Jev API (TypeSafe SystemOne)
-├── types/
-│   └── game.ts                 # Type definitions chung
-├── tests/
-│   └── strategy.test.cjs       # Unit tests cho strategy engine
-├── .env.example                # Mẫu biến môi trường
-├── .env.local                  # API key thực (git-ignored)
-├── package.json
-├── tsconfig.json               # Config chính (noEmit, bundler resolution)
-├── tsconfig.test.json          # Config build test (CommonJS → .test-build/)
-└── PROJECT.md                  # File này
-```
+- `app/page.tsx`, `app/layout.tsx`: trang và layout.
+- `app/globals.css`: bố cục responsive, màu sắc và trạng thái ô cờ.
+- `components/CaroGame.tsx`: bàn cờ, gọi API, tự lưu và bảng phân tích quyết định hiện tại.
+- `app/api/move/route.ts`: xác thực request và gọi luồng chọn nước.
+- `lib/game.ts`: thao tác bàn cờ, tọa độ, phát hiện thắng, kiểm tra lượt và tái dựng nước đi.
+- `lib/strategy.ts`: đánh giá mẫu đường cờ, lọc chiến thuật, tìm kiếm đối kháng và ngữ cảnh ứng viên.
+- `lib/decision.ts`: điều phối giữa kết quả cục bộ và Jev.
+- `lib/jev.ts`: tạo request TypeSafe, kiểm tra response và tổng hợp đánh giá.
+- `lib/session.ts`: reducer quản lý lượt, đi lại, reset, khôi phục và lỗi.
+- `lib/candidates.ts`: tiện ích sinh ứng viên còn trong repository; luồng quyết định hiện tại sinh ứng viên qua `lib/strategy.ts`.
+- `types/game.ts`: kiểu dữ liệu dùng chung.
+- `tests/strategy.test.cjs`, `tsconfig.test.json`: biên dịch và chạy kiểm thử bằng Node test runner.
 
----
+## Luồng quyết định
 
-## 3. Luồng xử lý một lượt đi (Pipeline)
+1. Kiểm tra nước thắng ngay của O; có thì trả về `tactical-win`.
+2. Gọi `analyzeMoves(board, 600, 4)`: ngân sách tìm kiếm 600 ms, tối đa bốn lượt ở vòng iterative deepening. Nhánh bắt buộc có thể được mở rộng thêm, với giới hạn ply nội bộ 16. Phần chuẩn bị/lọc chiến thuật vẫn chạy trước kiểm tra deadline, vì vậy 600 ms không phải giới hạn cứng cho toàn request.
+3. Nếu X đang có nước thắng trực tiếp, chọn kết quả phòng thủ cục bộ (`tactical-block`). Nếu đã tìm được chuỗi thắng trong các nhánh xét, trả về `engine`.
+4. `strategicChoices` lấy tối đa tám phương án từ thứ hạng chung, tấn công và phòng thủ. Không ép ứng viên phải nằm trong một khoảng điểm hẹp. Nước đã bị đánh giá thua được loại khi có lựa chọn khác; nếu mọi phương án đều thua, giữ các phương án tốt nhất còn lại. Không đổi một kết quả thắng đã tìm thấy lấy nước phát triển thông thường.
+5. Gửi một request cho Jev. Không có lượt tìm kiếm sâu thứ hai sau phản hồi.
+6. Chọn theo đánh giá tổng hợp của Jev. Khi bằng điểm ưu tiên thì dùng điểm cục bộ để phân định. Nếu mô hình lỗi hoặc hết thời gian, dùng ứng viên cục bộ đầu tiên (`fallback`).
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        NGƯỜI CHƠI CLICK Ô                           │
-│                    (Client — CaroGame.tsx)                          │
-│  • Đặt X lên bàn cờ                                                 │
-│  • Kiểm tra thắng/hòa ngay tại client                               │
-│  • Nếu chưa kết thúc → POST /api/move { board }                     │
-└────────────────────────────────┬────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                   SERVER — app/api/move/route.ts                    │
-│                                                                     │
-│  Bước 0: Validate board shape (15×15, chỉ X/O/null)                 │
-│     │                                                               │
-│     ▼                                                               │
-│  Bước 1: O có nước thắng ngay?  ──YES──>  Trả "tactical-win"        │
-│     │NO                                                             │
-│     ▼                                                               │
-│  Bước 2: X sắp thắng (cần chặn)? ──YES──>  Trả "tactical-block"     │
-│     │NO                                                             │
-│     ▼                                                               │
-│  Bước 3: analyzeMoves() — tìm kiếm alpha-beta                       │
-│     │       → strategicChoices() — lọc nước cùng điểm cao nhất      │
-│     ▼                                                               │
-│  Bước 4: chooseMoveWithJev() — gửi shortlist cho Jev                │
-│     │                                                               │
-│     ├─ Thành công ──> Trả "jev" + confidence + probabilities        │
-│     │                                                               │
-│     └─ Thất bại ───> Trả "fallback" (nước đầu analysis) + warning   │
-│                                                                     │
-└────────────────────────────────┬────────────────────────────────────┘
-                                 │
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                   CLIENT — Cập nhật UI                              │
-│  • Đặt O lên bàn cờ (validate lại ô trống)                          │
-│  • Kiểm tra thắng/hòa cho O                                         │
-│  • Hiển thị Decision Trace panel                                    │
-└─────────────────────────────────────────────────────────────────────┘
+Bộ tìm kiếm dùng negamax, alpha-beta, iterative deepening và bảng chuyển vị. Việc nhận dạng xét cả hàng liền, hàng đứt, ba mở, bốn buộc chặn và các đe dọa giao nhau. Đầu bàn được tính là biên chặn.
+
+## Dữ liệu và câu hỏi gửi Jev
+
+Endpoint được cấu hình trong code là `https://api.typesafe.ai/v1/systemone`. Khóa lấy từ `TYPESAFE_API_KEY`. Tên mô hình lấy từ `JEV_MODEL`, mặc định `jev-latest`.
+
+Shared state gồm luật, quy ước A–O/1–15, 15 hàng bàn cờ, tọa độ quân X/O, diễn biến ván hiện tại, các đe dọa của hai bên và ngữ cảnh từng ứng viên. Mỗi ứng viên có bàn cờ sau khi đặt O, điểm tấn công/phòng thủ, đặc trưng chiến thuật, độ sâu hoàn tất và một nhánh đáp trả minh họa.
+
+Mỗi request có `2 + 2 × số ứng viên` câu hỏi, tối đa 18:
+
+- `best_move` (Choice): chọn nước.
+- `plan` (Choice): tấn công, phòng thủ, chuẩn bị đòn kép hoặc phát triển.
+- `quality_<tọa độ>` (Score 0–4): tiềm năng tấn công sau nước đi.
+- `risk_<tọa độ>` (Noul 0–1): nguy cơ X còn chuỗi tấn công không thể hóa giải.
+
+Prompt nhấn mạnh cả các cách thắng thông thường: kết nối hai quân, ba mở hai đầu thành bốn mở rồi năm, các đầu bị chặn và thế đứt đoạn. Đòn đôi chỉ là một khả năng. Câu hỏi độc lập, cùng đọc shared state.
+
+Điểm ưu tiên hiện tại:
+
+```text
+attack = 0.5 + (score / 4 - 0.5) × scoreConfidence
+preference = 0.5 × choiceProbability + 0.2 × attack + 0.3 × (1 - risk)
 ```
 
----
+Response được kiểm tra kiểu, tọa độ hợp lệ, danh sách ứng viên, miền giá trị và phân bố xác suất. Tổng xác suất được chấp nhận trong sai số 0.02 rồi chuẩn hóa. Thiếu đánh giá bắt buộc thì chuyển sang fallback.
 
-## 4. Chi tiết từng module
+`source: verified` là tên tương thích trong dữ liệu: hiện biểu thị nước được tổng hợp từ các đánh giá khác với Choice ban đầu; **không có nghĩa đã chạy thêm một lượt tìm kiếm sau Jev**. Lời giải thích hiển thị được ghép từ đặc trưng chiến thuật và nhãn kế hoạch, không phải văn bản tự do do mô hình sinh.
 
-### 4.1 `lib/game.ts` — Logic cốt lõi
+## API
 
-| Hàm | Mục đích |
-|---|---|
-| `createEmptyBoard()` | Tạo bàn cờ 15×15 rỗng |
-| `cloneBoard(board)` | Sao chép sâu (immutable update) |
-| `isInside(row, col)` | Kiểm tra tọa độ trong biên |
-| `isBoardShapeValid(board)` | Validate payload từ client |
-| `isWinningMove(board, pos, player)` | Kiểm tra ≥5 quân liên tiếp qua 4 hướng |
-| `boardIsFull(board)` | Kiểm tra hòa |
-| `getLegalMoves(board)` | Liệt kê mọi ô trống |
-| `findImmediateMove(board, player)` | Tìm nước thắng ngay (duyệt toàn bộ) |
-| `positionToKey(pos)` / `keyToPosition(key)` | Chuyển đổi `{row,col}` ↔ `"H8"` |
-| `serializeBoard(board)` | Bàn cờ → mảng chuỗi `"."/"X"/"O"` cho Jev |
-
-**Hằng số:** `BOARD_SIZE = 15`, `WIN_LENGTH = 5`, 4 hướng kiểm tra: ngang, dọc, chéo chính, chéo phụ.
-
----
-
-### 4.2 `lib/candidates.ts` — Sinh nước ứng viên
-
-**Mục tiêu:** Giảm không gian tìm kiếm từ 225 ô xuống ~48 ô hợp lý.
-
-**Thuật toán:**
-1. Nếu bàn cờ trống → trả về ô trung tâm `H8`.
-2. Với mỗi quân đã đặt, xét mọi ô trống trong bán kính `radius` (mặc định 2).
-3. Chấm điểm mỗi ô: `score = density × 10 − centerDistance`
-   - `density`: số quân lân cận trong bán kính 2
-   - `centerDistance`: khoảng cách Manhattan tới tâm
-4. Sắp xếp giảm dần, lấy tối đa `maxCandidates` (mặc định 48).
-
-> Trong `strategy.ts`, hàm `rank()` gọi `generateCandidates(board, 2, 225)` để lấy nhiều ứng viên hơn cho việc đánh giá threat.
-
----
-
-### 4.3 `lib/strategy.ts` — Bộ máy tìm kiếm đối kháng
-
-#### 4.3.1 Hàm đánh giá `potential(board, move, player)`
-
-Chấm điểm mọi **cửa sổ 5 ô** đi qua một vị trí (kể cả dòng đứt đoạn):
-
-| Số quân trong cửa sổ | Điểm cơ sở | Ghi chú |
-|---|---|---|
-| 5 | 10,000,000 (WIN) | Thắng ngay |
-| 4 | 8,000 × (1 + open×0.5) | Tứ — thưởng thêm nếu ≥2 đầu thắng |
-| 3 | 450 × (1 + open×0.5) | Tam mở (≥675 = open three) |
-| 2 | 35 × (1 + open×0.5) | Cặp |
-| 1 | 2 × (1 + open×0.5) | Quân đơn lẻ |
-
-**Thưởng tổ hợp:**
-- 2 tứ → +500,000 (đôi tứ = thắng chắc)
-- 1 tứ + 1 tam mở → +80,000
-- 2 tam mở → +15,000
-
-#### 4.3.2 Hàm xếp hạng `rank(board, player)`
-
-Với mỗi ứng viên:
-- `attack = potential(board, move, player)` — sức tấn công
-- `defense = potential(board, move, opponent)` — giá trị phòng thủ
-- `priority = max(attack, defense × 1.1) + min(attack, defense) × 0.1`
-
-Sắp xếp theo `priority` giảm dần.
-
-#### 4.3.3 Tìm kiếm chính `analyzeMoves(board, budgetMs, maxDepth)`
-
-```
-Thuật toán: Negamax + Alpha-Beta Pruning + Iterative Deepening
-Ngân sách: budgetMs (mặc định 1000ms)
-Độ sâu tối đa: maxDepth (mặc định 4)
-```
-
-**Các bước:**
-1. `rank()` toàn bộ ứng viên cho O.
-2. Nếu có nước thắng ngay (`attack ≥ WIN`) → chỉ xét nhóm đó.
-3. Nếu có nước buộc phải chặn (`defense ≥ WIN`) → chỉ xét nhóm chặn.
-4. Ngược lại → lấy top 14 ứng viên.
-5. **Iterative deepening** từ depth 1 → maxDepth:
-   - Mỗi vòng lặp, chạy negamax cho từng ứng viên gốc.
-   - Nếu hết thời gian → giữ kết quả vòng trước.
-6. Trả về danh sách `{ move, score, depth }` đã sắp xếp.
-
-**Quiescence extension:** Khi hết depth mà đối phương có nước buộc chặn, mở rộng thêm 1 ply để tránh đánh giá sai.
-
-#### 4.3.4 `strategicChoices(analysis)`
-
-Lọc **chỉ các nước có điểm cao nhất** (bằng điểm với nước đầu tiên), tối đa 6 nước. Đây chính là danh sách gửi cho Jev — đảm bảo Jev chỉ chọn trong nhóm tối ưu.
-
----
-
-### 4.4 `lib/jev.ts` — Tích hợp Jev (TypeSafe SystemOne API)
-
-#### Endpoint
-```
-POST https://api.typesafe.ai/v1/systemone
-Authorization: Bearer <TYPESAFE_API_KEY>
-```
-
-#### Payload gửi đi
-
-```jsonc
-{
-  "model": "jev-latest",
-  "state": {
-    "game": "Caro / Gomoku",
-    "rules": { /* luật chơi, quân, điều kiện thắng */ },
-    "coordinates": "Columns A–O, Rows 1–15",
-    "board_rows": ["...............", "...X...........", ...],  // serializeBoard()
-    "board_legend": ". = empty, X = human, O = Jev"
-  },
-  "questions": {
-    "best_move": {
-      "type": "choice",
-      "instructions": "Chọn nước mạnh nhất cho O trong các ứng viên đã được search thẩm định...",
-      "criteria": {
-        "H8": "Place O at H8. Search score: 12345; completed depth: 3. Higher is better for O.",
-        "G7": "Place O at G7. Search score: 12345; completed depth: 3. Higher is better for O.",
-        // ...
-      }
-    }
-  }
-}
-```
-
-#### Response nhận về
-
-```jsonc
-{
-  "model": "jev-...",
-  "answers": {
-    "best_move": {
-      "type": "choice",
-      "choice": "H8",           // nước Jev chọn
-      "confidence": 0.72,       // độ tin cậy
-      "probabilities": { "H8": 0.72, "G7": 0.15, ... }
-    }
-  },
-  "usage": { "input_tokens": 1234, "output_tokens": 56 }
-}
-```
-
-#### Validation phía server
-
-1. Parse `choice` → tọa độ `{row, col}` qua regex `^([A-O])(1[0-5]|[1-9])$`.
-2. Kiểm tra tọa độ nằm trong danh sách ứng viên.
-3. Kiểm tra ô đó trống trên board.
-4. Nếu bất kỳ bước nào fail → ném lỗi → route trả fallback.
-
-#### Timeout & xử lý lỗi
-
-- `AbortSignal.timeout(8000)` — tối đa 8 giây chờ Jev.
-- API key thiếu → lỗi rõ ràng.
-- HTTP không 2xx → lỗi kèm body (cắt 500 ký tự).
-
----
-
-### 4.5 `app/api/move/route.ts` — API Route (Pipeline orchestrator)
-
-| Bước | Điều kiện | Kết quả | Source |
-|---|---|---|---|
-| Validate | Board sai shape | 400 | — |
-| ① Thắng ngay | `findImmediateMove(board, "O")` ≠ null | 200 | `tactical-win` |
-| ② Chặn ngay | `findImmediateMove(board, "X")` ≠ null | 200 | `tactical-block` |
-| ③ Tìm kiếm | `analyzeMoves` + `strategicChoices` | — | — |
-| ④ Jev | `chooseMoveWithJev(board, candidates, analysis)` | 200 | `jev` |
-| ⑤ Fallback | Jev lỗi | 200 | `fallback` + `warning` |
-| Lỗi khác | Bất ngờ | 500 | — |
-
-**Đảm bảo:** Bước ①② không gọi API ngoài — phản hồi tức thời, deterministic, confidence = 1.
-
----
-
-### 4.6 `components/CaroGame.tsx` — UI Client
-
-**State:**
-- `board` — bàn cờ hiện tại
-- `result` — `"human" | "jev" | "draw" | null`
-- `thinking` — đang chờ Jev
-- `lastDecision` — object `MoveResponse` để hiển thị trace
-- `lastHumanMove` / `lastJevMove` — highlight ô vừa đánh
-
-**Xử lý click:**
-1. Guard: không click khi đang thinking / đã kết thúc / ô đã có quân.
-2. Đặt X → kiểm tra thắng/hòa.
-3. Gọi `askJev(nextBoard)` → fetch POST → cập nhật board + trace.
-4. Validate lại phía client: ô Jev trả về phải trống.
-
-**Decision Trace Panel:**
-- Source (nhãn tiếng Anh)
-- Confidence %
-- Model name
-- Top 6 xác suất (progress bar)
-- Token usage
-- Warning (nếu fallback)
-
----
-
-### 4.7 `types/game.ts` — Type Definitions
+`POST /api/move` nhận JSON:
 
 ```typescript
-type Player = "X" | "O";
-type Cell = Player | null;
-type Board = Cell[][];
-type Position = { row: number; col: number };
-type MoveSource = "tactical-win" | "tactical-block" | "jev" | "fallback";
-type MoveResponse = {
-  move: Position;
-  key: string;          // "H8"
-  source: MoveSource;
-  confidence: number;   // 0–1
-  probabilities: Record<string, number>;
-  model?: string;
-  usage?: { input_tokens: number; output_tokens: number };
-  warning?: string;
-};
+{
+  board: ("X" | "O" | null)[][]; // Đúng 15 × 15
+  history?: { player: "X" | "O"; move: { row: number; col: number } }[];
+}
 ```
 
----
+`row`/`col` bắt đầu từ 0. Lượt O hợp lệ cần số X bằng số O cộng một. Ván phải chưa kết thúc. Nếu cung cấp history, API tái dựng và yêu cầu khớp bàn cờ; trường mode từ client cũ được bỏ qua.
 
-## 5. Cách triển khai & chạy dự án
+Response gồm nước chọn, tọa độ, nguồn quyết định, thời gian, độ sâu, số node, đánh giá ứng viên và metadata Jev khi có. JSON/bàn cờ/history sai trả 400; sai lượt hoặc ván đã kết thúc trả 409; lỗi chưa xử lý trả 500; request bị hủy có thể trả 499.
 
-### 5.1 Yêu cầu
+Timeout gọi Jev là 12 giây. Client giới hạn lượt request 30 giây, route khai báo `maxDuration = 30`. Không trả nguyên response lỗi từ nhà cung cấp hoặc khóa API cho trình duyệt.
 
-- Node.js ≥ 18
-- API key từ TypeSafe (cho Jev)
+## Trạng thái ván và giao diện
 
-### 5.2 Cài đặt
+Reducer có trạng thái `human`, `thinking`, `error`, `finished`. Mỗi lượt có requestId; phản hồi cũ sau reset/đi lại bị bỏ qua. Client hủy request khi lượt không còn hiệu lực. Lỗi không cho người chơi đánh thêm X; người chơi có thể thử lại hoặc đi lại.
 
-```bash
-# Clone / copy project
-cd Caro-Jev
+Session giữ danh sách nước đi và **một quyết định Jev hiện tại**, không giữ toàn bộ decision trace từng lượt. Đi lại bỏ cặp X/O gần nhất, hoặc X đang chờ O, rồi xóa quyết định đang hiển thị.
 
-# Cài dependencies
-npm install
+`localStorage` dùng khóa `jev-caro:v2`, lưu version và các nước của ván hiện tại. Khi mở lại, nước đi được xác thực; ván đang chờ O yêu cầu bấm tiếp tục. Bản lưu không chứa metadata phân tích Jev.
 
-# Tạo file môi trường
-cp .env.example .env.local
-# Sửa .env.local: thay TYPESAFE_API_KEY bằng key thực
-```
+Giao diện còn bàn cờ, Ván mới, Đi lại, trạng thái lưu và bảng phân tích. Đã xóa chọn cấp độ, đánh số quân, xuất JSON và lịch sử/xem lại ván cùng code/CSS liên quan. Danh sách nước đi nội bộ vẫn cần cho tính hợp lệ, đi lại, lưu ván và ngữ cảnh mô hình.
 
-### 5.3 Chạy development server
+Màu chính: nền `#f3f0e8`, panel `#fffdf7`, bàn cờ `#f4d7a1`, viền `#111111`, X `#0057ff`, O `#ff3b30`. Ô thuộc hàng thắng dùng **xanh lục `#4ade80`**; nút Ván mới vẫn vàng `#ffd60a`.
 
-```bash
-npm run dev
-# Mở http://localhost:3000
-```
+Trên desktop đủ cao, layout dùng chiều cao viewport, bàn cờ co theo vùng còn lại và bảng phân tích cuộn riêng. Trên màn hình hẹp, hai cột chuyển thành một cột. Có điều khiển bàn phím và nhãn tọa độ cho từng ô.
 
-### 5.4 Build production
+## Kiểm thử và giới hạn
 
-```bash
-npm run build
-npm run start
-```
+`npm test` biên dịch vào `.test-build` rồi chạy 24 test. Các nhóm kiểm tra gồm thắng/chặn trực tiếp, ba mở và bốn đứt, đòn giao nhau, tình huống ảnh người dùng từng báo, tám phép đối xứng, tính hợp lệ của nhánh, ứng viên đa dạng, schema Jev, API/fallback, reset/đi lại và bản lưu. API được mock trong test; test không xác nhận chất lượng của một phiên bản mô hình ngoài dịch vụ.
 
-### 5.5 Chạy tests
+Chạy thêm `npx tsc --noEmit` và `npm run build` để kiểm tra kiểu và production build. Thay đổi giao diện cần kiểm tra trực tiếp ở kích thước laptop và mobile.
 
-```bash
-npm test
-```
+Tìm kiếm có giới hạn thời gian, độ sâu và số nhánh. Các trường `proven`, `winning`, `losing` phản ánh những nhánh đã xét, không phải chứng minh vét cạn toàn bàn. Độ tin cậy Choice và Noul không phải xác suất thắng được hiệu chuẩn cho cả ván.
 
-Lệnh test thực hiện:
-1. Biên dịch TypeScript (module Node16) vào `.test-build/` (dùng `tsconfig.test.json`, chỉ bao gồm `lib/game.ts`, `lib/candidates.ts`, `lib/strategy.ts`, `types/game.ts`).
-2. Chạy `node --test tests/strategy.test.cjs`.
-
-### 5.6 Biến môi trường
-
-| Biến | Bắt buộc | Mô tả |
-|---|---|---|
-| `TYPESAFE_API_KEY` | Có | API key gọi Jev. Thiếu → fallback mode |
-
----
-
-## 6. Test cases (`tests/strategy.test.cjs`)
-
-| # | Test | Kiểm tra |
-|---|---|---|
-| 1 | Takes a win instead of defending | Ưu tiên thắng hơn chặn |
-| 2 | Blocks a broken four | Chặn tứ đứt đoạn |
-| 3 | Blocks an open three | Chặn tam mở trước khi thành tứ không thể chặn |
-| 4 | Prevents a crossing double threat | Chống đe dọa kép chéo |
-| 5 | Creates a forcing open four | Tạo tứ mở buộc đối thủ phản hồi |
-| 6 | Handles diagonal edge threats | Xử lý threat ở biên đường chéo |
-| 7 | Search preserves input & restricts choices | Board không bị mutate; Jev chỉ nhận nước điểm cao nhất |
-| 8 | Empty, full, expired-budget | Bàn cờ trống → H8; bàn đầy → []; hết budget → vẫn trả nước hợp lệ |
-
----
-
-## 7. Sơ đồ kiến trúc tổng thể
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                         BROWSER                              │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │              CaroGame.tsx (Client Component)           │  │
-│  │  • Bàn cờ 15×15 (X = người chơi, O = Jev)              │  │
-│  │  • Decision Trace Panel                                │  │
-│  │  • handleCellClick → POST /api/move                    │  │
-│  └────────────────────────┬───────────────────────────────┘  │
-└───────────────────────────┼──────────────────────────────────┘
-                            │ HTTP POST { board }
-                            ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    NEXT.JS SERVER (API Route)                │
-│                                                              │
-│  ┌──────────────────────────────────────────────────────┐    │
-│  │            app/api/move/route.ts                     │    │
-│  │  Validate → Tactical → Search → Jev → Response       │    │
-│  └───────┬──────────┬───────────┬───────────────────────┘    │
-│          │          │           │                            │
-│          ▼          ▼           ▼                            │
-│  ┌──────────┐ ┌────────────┐ ┌──────────┐                    │
-│  │ lib/game │ │lib/strategy│ │ lib/jev  │                    │
-│  │  .ts     │ │   .ts      │ │   .ts    │                    │
-│  └──────────┘ └────────────┘ └─────┬────┘                    │
-│          ▲                         │                         │
-│          │                         │ HTTPS                   │
-│  ┌───────┴──────┐                  ▼                         │
-│  │lib/candidates│   ┌─────────────────────────┐              │
-│  │   .ts        │   │  TypeSafe SystemOne API │              │
-│  └──────────────┘   │  (Jev AI Model)         │              │
-│                     └─────────────────────────┘              │
-└──────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 8. Nguyên tắc thiết kế
-
-1. **Deterministic trước, AI sau:** Nước bắt buộc (thắng/chặn) luôn do code xử lý — không phụ thuộc API, không latency.
-2. **Jev không bao giờ đi sai:** Bị giới hạn trong shortlist đã validate; kiểm tra 2 lớp (server + client).
-3. **Graceful degradation:** Jev lỗi → fallback về kết quả tìm kiếm, game vẫn chơi được.
-4. **Minh bạch:** Mọi quyết định đều có trace (source, confidence, probabilities, tokens).
-5. **Immutable state:** Board không bao giờ bị mutate trực tiếp; luôn clone trước khi thử nghiệm.
-6. **Time-bounded search:** Không treo server; iterative deepening dừng đúng hạn.
-
----
-
-## 9. Ghi chú mở rộng
-
-- **Không có database:** Toàn bộ state nằm trong React state phía client. Mỗi request gửi toàn bộ board.
-- **Không có authentication:** Demo đơn người dùng.
-- **Không có rate limiting:** Nếu triển khai production, cần thêm middleware.
-- **CSS thuần:** Không dùng Tailwind/CSS Modules — toàn bộ trong `globals.css`.
-<<<<<<< ours
-- **Path alias:** `@/` → root project (cấu hình trong `tsconfig.json`).
-=======
-- **Path alias:** `@/` → root project (cấu hình trong `tsconfig.json`).
->>>>>>> theirs
+Chưa có database, kho trận thua, truy hồi bài học, fine-tuning hoặc cơ chế tự học xuyên ván. Tự lưu chỉ phục vụ ván hiện tại trên trình duyệt đó.
