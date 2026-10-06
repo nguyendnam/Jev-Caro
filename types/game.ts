@@ -7,7 +7,26 @@ export type Position = {
   col: number;
 };
 
-export type MoveSource = "tactical-win" | "tactical-block" | "jev" | "fallback";
+export type GameMove = { player: Player; move: Position };
+export type MoveSource = "tactical-win" | "tactical-block" | "jev" | "verified" | "engine" | "fallback";
+
+export type CandidateTrace = {
+  key: string;
+  score: number;
+  depth: number;
+  line: string[];
+  threats: string[];
+  probability?: number;
+  strategyScore?: number;
+  risk?: number;
+};
+
+export type JevAssessment = {
+  key: string;
+  strategyScore: number;
+  risk: number;
+  preference: number;
+};
 
 export type MoveResponse = {
   move: Position;
@@ -23,4 +42,16 @@ export type MoveResponse = {
   warning?: string;
   searchDepth?: number;
   reason?: string;
+  elapsedMs?: number;
+  nodes?: number;
+  candidates?: CandidateTrace[];
+  principalVariation?: string[];
+  evaluation?: "winning" | "losing" | "uncertain";
+  jev?: {
+    choice: string;
+    plan: string;
+    questions: number;
+    assessments: JevAssessment[];
+    overridden: boolean;
+  };
 };

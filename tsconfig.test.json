@@ -13,6 +13,7 @@
     "lib/candidates.ts",
     "lib/strategy.ts",
     "lib/jev.ts",
+    "lib/session.ts",
     "app/api/move/route.ts",
     "types/game.ts"
   ],

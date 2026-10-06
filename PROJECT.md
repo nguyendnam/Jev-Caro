@@ -441,4 +441,8 @@ Lệnh test thực hiện:
 - **Không có authentication:** Demo đơn người dùng.
 - **Không có rate limiting:** Nếu triển khai production, cần thêm middleware.
 - **CSS thuần:** Không dùng Tailwind/CSS Modules — toàn bộ trong `globals.css`.
+<<<<<<< ours
 - **Path alias:** `@/` → root project (cấu hình trong `tsconfig.json`).
+=======
+- **Path alias:** `@/` → root project (cấu hình trong `tsconfig.json`).
+>>>>>>> theirs

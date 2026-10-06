@@ -1,4 +1,4 @@
-import type { Board, Player, Position } from "@/types/game";
+import type { Board, GameMove, Player, Position } from "@/types/game";
 
 export const BOARD_SIZE = 15;
 export const WIN_LENGTH = 5;
@@ -112,4 +112,51 @@ export function keyToPosition(key: string): Position | null {
 
 export function serializeBoard(board: Board): string[] {
   return board.map((row) => row.map((cell) => cell ?? ".").join(""));
+}
+
+export function getWinningLine(board: Board): Position[] {
+  for (let row = 0; row < BOARD_SIZE; row++) for (let col = 0; col < BOARD_SIZE; col++) {
+    const player = board[row][col];
+    if (!player) continue;
+    for (const [dr, dc] of DIRECTIONS) {
+      const line: Position[] = [];
+      let r = row;
+      let c = col;
+      while (isInside(r, c) && board[r][c] === player) {
+        line.push({ row: r, col: c });
+        r += dr;
+        c += dc;
+      }
+      if (line.length >= WIN_LENGTH) return line;
+    }
+  }
+  return [];
+}
+
+export function replayMoves(value: unknown): { board: Board; moves: GameMove[] } | null {
+  if (!Array.isArray(value) || value.length > BOARD_SIZE * BOARD_SIZE) return null;
+  const board = createEmptyBoard();
+  const moves: GameMove[] = [];
+  let finished = false;
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object" || !entry.move || finished) return null;
+    const { row, col } = entry.move;
+    const player: Player = moves.length % 2 ? "O" : "X";
+    if (entry.player !== player || !Number.isInteger(row) || !Number.isInteger(col) ||
+      !isInside(row, col) || board[row][col] !== null) return null;
+    board[row][col] = player;
+    moves.push({ player, move: { row, col } });
+    finished = isWinningMove(board, { row, col }, player);
+  }
+  return { board, moves };
+}
+
+export function validateJevTurn(board: Board): string | null {
+  if (getWinningLine(board).length) return "Ván cờ đã kết thúc.";
+  if (boardIsFull(board)) return "Bàn cờ đã đầy.";
+  const cells = board.flat();
+  if (cells.filter(cell => cell === "X").length !== cells.filter(cell => cell === "O").length + 1) {
+    return "Số quân không hợp lệ: phải đến lượt O sau một nước X.";
+  }
+  return null;
 }
